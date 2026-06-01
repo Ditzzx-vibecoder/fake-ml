@@ -86,4 +86,4 @@ console.log(result)
 
 ## License
 
-MIT © [Ditzzx](https://github.com/Ditzzx-vibecoder)
+MIT © [Ditzzx](https://github.com/Ditzzx-vibecoder) 
