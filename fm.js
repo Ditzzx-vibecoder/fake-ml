@@ -113,7 +113,7 @@ function drawUsername(ctx, username, cfg) {
   ctx.fillText(name, centerX, y + h / 2 + size / 3)
 }
 
-async function generateCard({ avatar, username = 'Player', rank = config.rank_name, border = config.border_num } = {}) {
+async function generateCard({ avatar, username = 'Player', rank = config.rank_name, border = config.border_num, outputDir = './' } = {}) {
   FontLibrary.use('NotoSans', [ASSETS.font])
 
   const useBorder = border && border > 0
@@ -152,7 +152,9 @@ async function generateCard({ avatar, username = 'Player', rank = config.rank_na
 
   const buffer = await canvas.toBuffer('png', { quality: 1.0 })
 
-  const outputPath = path.join(__dirname, `fm_${Date.now()}.png`)
+  const outputFolder = path.join(outputDir, 'fake-ml')
+  if (!fs.existsSync(outputFolder)) fs.mkdirSync(outputFolder, { recursive: true })
+  const outputPath = path.join(outputFolder, `${username}.png`)
   fs.writeFileSync(outputPath, buffer)
 
   return {
