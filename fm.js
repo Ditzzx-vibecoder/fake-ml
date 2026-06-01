@@ -1,13 +1,13 @@
 const { Canvas, loadImage, FontLibrary } = require('skia-canvas')
 const path = require('path')
 const fs = require('fs')
-const ASSETS_DIR = path.join(__dirname, '..', 'assets')
+
+const ASSETS_DIR = path.join(__dirname, 'assets')
 
 const ASSETS = {
-  lobby:  path.join(ASSETS_DIR, 'Lobby.jpg'),
-  avatar: path.join(ASSETS_DIR, 'avatar.jpg'),
-  flag:   path.join(ASSETS_DIR, 'Bendera.svg'),
-  font:   path.join(ASSETS_DIR, 'noto-sans.regular.ttf'),
+  lobby: path.join(ASSETS_DIR, 'Lobby.jpg'),
+  flag:  path.join(ASSETS_DIR, 'Bendera.svg'),
+  font:  path.join(ASSETS_DIR, 'noto-sans.regular.ttf'),
 }
 
 function getRankPath(rank) {
@@ -20,51 +20,18 @@ function getBorderPath(border) {
 
 const config = {
   canvas: { width: 960, height: 1706 },
-
   rank_name: 'imo',
   border_num: 0,
-
-  avatar: {
-    x: 389,
-    y: 446,
-    size: 204,
-    borderRadius: 12,
-  },
-
-  outline: {
-    color: '#b8956f',
-    thickness: 4,
-  },
-
-  rank: {
-    x: 387,
-    y: 760,
-    size: 210,
-  },
-
-  flag: {
-    x: 364,
-    y: 428,
-    size: 55,
-  },
-
-  username: {
-    a: 681,
-    b: 727,
-    c: 400,
-    centerX: 496,
-    d: 609,
-    fontSize: 36,
-    maxChars: 15,
-    color: '#ffffff',
-  },
-
+  avatar: { x: 389, y: 446, size: 204, borderRadius: 12 },
+  outline: { color: '#b8956f', thickness: 4 },
+  rank: { x: 387, y: 760, size: 210 },
+  flag: { x: 364, y: 428, size: 55 },
+  username: { a: 681, b: 727, c: 400, centerX: 496, d: 609, fontSize: 36, maxChars: 15, color: '#ffffff' },
   debug: false,
 }
 
 const BORDER_OFFSET = {
-  1: 26,
-  2: 36, 3: 26, 4: 26, 5: 26,
+  1: 26, 2: 36, 3: 26, 4: 26, 5: 26,
   6: 26, 7: 26, 8: 26, 9: 26,
   10: 26, 11: 22, 12: 28, 13: 26,
   14: 21, 15: 26, 16: 26,
@@ -80,12 +47,10 @@ const RANK_CONFIG = {
   mawi:   { size: 210, x: 387, y: 760 },
 }
 
-async function fetchImage(filePath) {
-  return loadImage(filePath)
-}
-
-async function fetchFont(filePath, alias) {
-  FontLibrary.use(alias, [filePath])
+async function loadFromUrl(url) {
+  const res = await fetch(url)
+  const buffer = await res.arrayBuffer()
+  return loadImage(Buffer.from(buffer))
 }
 
 function calcHeight(img, size) {
@@ -96,9 +61,7 @@ function drawAvatar(ctx, img, cfg, outlineCfg = null) {
   const { x, y, size, borderRadius } = cfg
   const height = calcHeight(img, size)
   const r = borderRadius || 0
-
   ctx.save()
-
   if (outlineCfg) {
     const { color, thickness } = outlineCfg
     ctx.beginPath()
@@ -107,7 +70,6 @@ function drawAvatar(ctx, img, cfg, outlineCfg = null) {
     ctx.lineWidth = thickness * 2
     ctx.stroke()
   }
-
   ctx.beginPath()
   ctx.roundRect(x, y, size, height, r)
   ctx.clip()
@@ -119,15 +81,12 @@ function drawBorder(ctx, img, avatarCfg, borderCfg) {
   const { x, y, size } = avatarCfg
   const { offset } = borderCfg
   const bSize = size + offset * 2
-  const bX = x - offset
-  const bY = y - offset
-  ctx.drawImage(img, bX, bY, bSize, bSize)
+  ctx.drawImage(img, x - offset, y - offset, bSize, bSize)
 }
 
 function drawFlagCircle(ctx, img, cfg) {
   const { x, y, size } = cfg
   const radius = size / 2
-
   ctx.save()
   ctx.beginPath()
   ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2)
@@ -141,9 +100,7 @@ function drawUsername(ctx, username, cfg) {
   const y = a
   const w = d - c
   const h = b - a
-
   const name = username.slice(0, maxChars)
-
   let size = fontSize
   ctx.textAlign = 'center'
   while (size > 8) {
@@ -151,56 +108,40 @@ function drawUsername(ctx, username, cfg) {
     if (ctx.measureText(name).width <= w) break
     size -= 1
   }
-
   ctx.fillStyle = color
   ctx.font = `${size}px NotoSans`
-  const textY = y + h / 2 + size / 3
-  ctx.fillText(name, centerX, textY)
+  ctx.fillText(name, centerX, y + h / 2 + size / 3)
 }
 
-function drawDebugSafeZone(ctx, cfg) {
-  const { a, b, c, d } = cfg
-  const x = c
-  const y = a
-  const w = d - c
-  const h = b - a
-
-  ctx.save()
-  ctx.lineWidth = 3
-  ctx.strokeStyle = 'red'
-  ctx.strokeRect(x, y, w, h)
-  ctx.font = '20px NotoSans'
-  ctx.fillStyle = 'red'
-  ctx.fillText(`${w}x${h}`, x + 4, y + 20)
-  ctx.restore()
-}
-
-async function generateCard({ username = 'Player', rank = config.rank_name, border = config.border_num } = {}) {
-  await fetchFont(ASSETS.font, 'NotoSans')
+async function generateCard({ avatar, username = 'Player', rank = config.rank_name, border = config.border_num } = {}) {
+  FontLibrary.use('NotoSans', [ASSETS.font])
 
   const useBorder = border && border > 0
 
+  const avatarImg = avatar
+    ? await loadFromUrl(avatar)
+    : await loadImage(path.join(ASSETS_DIR, 'avatar.jpg'))
+
   const baseImages = [
-    fetchImage(ASSETS.lobby),
-    fetchImage(ASSETS.avatar),
-    fetchImage(ASSETS.flag),
-    fetchImage(getRankPath(rank)),
+    loadImage(ASSETS.lobby),
+    Promise.resolve(avatarImg),
+    loadImage(ASSETS.flag),
+    loadImage(getRankPath(rank)),
   ]
 
-  if (useBorder) baseImages.push(fetchImage(getBorderPath(border)))
+  if (useBorder) baseImages.push(loadImage(getBorderPath(border)))
 
-  const [lobbyImg, avatarImg, flagImg, rankImg, borderImg] = await Promise.all(baseImages)
+  const [lobbyImg, avatarImgLoaded, flagImg, rankImg, borderImg] = await Promise.all(baseImages)
 
   const { width, height } = config.canvas
   const canvas = new Canvas(width, height)
   const ctx = canvas.getContext('2d')
 
   ctx.drawImage(lobbyImg, 0, 0, width, height)
-  drawAvatar(ctx, avatarImg, config.avatar, useBorder ? null : config.outline)
+  drawAvatar(ctx, avatarImgLoaded, config.avatar, useBorder ? null : config.outline)
 
   if (useBorder) {
-    const borderOffset = BORDER_OFFSET[border] ?? 26
-    drawBorder(ctx, borderImg, config.avatar, { offset: borderOffset })
+    drawBorder(ctx, borderImg, config.avatar, { offset: BORDER_OFFSET[border] ?? 26 })
   }
 
   const rankCfg = RANK_CONFIG[rank] ?? { size: config.rank.size, x: config.rank.x, y: config.rank.y }
@@ -209,33 +150,24 @@ async function generateCard({ username = 'Player', rank = config.rank_name, bord
   drawFlagCircle(ctx, flagImg, config.flag)
   drawUsername(ctx, username, config.username)
 
-  if (config.debug) drawDebugSafeZone(ctx, config.username)
+  const buffer = await canvas.toBuffer('png', { quality: 1.0 })
 
-  return canvas.toBuffer('png', { quality: 1.0 })
-}
+  const outputPath = path.join(__dirname, `fm_${Date.now()}.png`)
+  fs.writeFileSync(outputPath, buffer)
 
-module.exports = async (ctx, { TMP_DIR, args }) => {
-  const parts = (args || '').trim().split(' ')
-  const username = parts[0] || ctx.from?.first_name || 'Player'
-  const rank = parts[1] || config.rank_name
-  const border = parseInt(parts[2]) || 0
-
-  const loading = await ctx.reply('⏳ Generating card...')
-
-  try {
-    const buffer = await generateCard({ username, rank, border })
-    const outPath = path.join(TMP_DIR, `fm_${Date.now()}.png`)
-    fs.writeFileSync(outPath, buffer)
-
-    await ctx.replyWithPhoto(
-      { source: outPath, filename: 'lobby.png' },
-      { caption: `🎮 ${username}` }
-    )
-
-    fs.unlink(outPath, () => {})
-  } catch (e) {
-    await ctx.reply(`❌ Gagal generate card: ${e.message}`)
+  return {
+    status: 'success',
+    code: 200,
+    avatar: avatar || 'default',
+    username,
+    rank,
+    border,
+    result: outputPath,
   }
-
-  await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(() => {})
 }
+
+module.exports = generateCard
+module.exports.generateCard = generateCard
+module.exports.config = config
+module.exports.RANK_CONFIG = RANK_CONFIG
+module.exports.BORDER_OFFSET = BORDER_OFFSET
