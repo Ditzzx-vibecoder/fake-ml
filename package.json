@@ -1,6 +1,6 @@
 {
   "name": "fake-ml",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Fake Mobile Legends lobby card generator",
   "main": "fm.js",
   "engines": {
